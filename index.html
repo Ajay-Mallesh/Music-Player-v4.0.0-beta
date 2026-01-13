@@ -499,7 +499,7 @@
 
             <!-- Streaming controls: add a URL, opt-in ad filtering, quick skip -->
             <div style="display:flex;align-items:center;gap:10px;margin-left:10px;flex-wrap:wrap;">
-                <input id="streamUrlInput" type="text" placeholder="Enter stream URL (http/https/.m3u8/.mp3)" style="min-width:320px;padding:10px;border-radius:10px;border:none;outline:none;">
+                <input id="streamUrlInput" type="text" placeholder="Enter stream URL (http/https/.m3u8/.mp3) - CORS-enabled sources only" style="min-width:320px;padding:10px;border-radius:10px;border:none;outline:none;">
                 <button class="btn" onclick="addStreamFromInput()">➕ Add Stream</button>
                 <button class="btn btn-secondary" onclick="openStreamInNewTab()">🔗 Open Stream</button>
                 <button class="btn btn-primary" onclick="playStreamFromInput()">▶ Play Stream</button>
@@ -507,7 +507,7 @@
                     <input id="streamAdFilter" type="checkbox" style="transform:scale(1.15)" /> Ad Filter
                 </label>
                 <label style="display:flex;align-items:center;gap:6px;color:#ecf0f1;font-weight:600;">
-                    <input id="preferEmbed" type="checkbox" style="transform:scale(1.15)" checked /> Prefer Embed
+                    <input id="preferEmbed" type="checkbox" style="transform:scale(1.15)" checked /> Prefer Embed (uncheck to extract YouTube audio for EQ support)
                 </label>
                 <button class="btn btn-success" onclick="skipAdSegment()" id="skipAdBtn">⏭️ Skip Ad</button>
             </div>
@@ -690,6 +690,9 @@
         <!-- 10-Band Equalizer -->
         <div class="equalizer-section">
             <div class="control-title">🎛️ 10-Band Equalizer</div>
+            <div style="background: rgba(255,165,0,0.1); border-left: 3px solid #ff9800; padding: 10px; margin-bottom: 15px; border-radius: 5px;">
+                <strong>⚠️ Note:</strong> EQ works with direct audio (.mp3, .m3u8). For YouTube videos, use main volume control instead.
+            </div>
             
             <!-- Bass & Treble Slider Controls -->
              <!-- New Addition on 25/12/2025 --> <!-- Updated Bass/Treble Controls [-10db to +10db] -->
@@ -6486,13 +6489,68 @@ MIT License - See \`LICENSE.txt\` for details
             };
         }
 
-        // YouTube to Audio converter using free API
+        // YouTube to Audio converter - IMPROVED with multiple extraction methods
         async function convertYouTubeToAudio(youtubeUrl) {
             const videoId = extractYouTubeId(youtubeUrl);
             if (!videoId) return null;
             
+            console.log('🔍 Attempting YouTube audio extraction for:', videoId);
+            
+            // METHOD 1: Try Noxplayer API (most reliable free service)
             try {
-                // Try using a free YouTube audio extraction service
+                console.log('📡 Method 1: Trying Noxplayer API...');
+                const noxUrl = `https://noxplayer.com/api/convert?url=https://www.youtube.com/watch?v=${videoId}`;
+                const response = await fetch(noxUrl);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.url) {
+                        console.log('✅ Audio extracted via Noxplayer');
+                        return data.url;
+                    }
+                }
+            } catch (e) {
+                console.warn('❌ Noxplayer API failed:', e.message);
+            }
+            
+            // METHOD 2: Try YouTube ScriptAPI (server-based)
+            try {
+                console.log('📡 Method 2: Trying YouTube ScriptAPI...');
+                const scriptApiUrl = `https://youtube-script-api.vercel.app/api/getAudio?id=${videoId}`;
+                const response = await fetch(scriptApiUrl);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.audioUrl) {
+                        console.log('✅ Audio extracted via ScriptAPI');
+                        return data.audioUrl;
+                    }
+                }
+            } catch (e) {
+                console.warn('❌ ScriptAPI failed:', e.message);
+            }
+            
+            // METHOD 3: Try infernoYT (alternative service)
+            try {
+                console.log('📡 Method 3: Trying infernoYT...');
+                const infernoUrl = `https://infernoyt.herokuapp.com/api/audioUrl?url=https://www.youtube.com/watch?v=${videoId}`;
+                const response = await fetch(infernoUrl);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.url) {
+                        console.log('✅ Audio extracted via infernoYT');
+                        return data.url;
+                    }
+                }
+            } catch (e) {
+                console.warn('❌ infernoYT failed:', e.message);
+            }
+            
+            // METHOD 4: Fallback - Direct YouTube audio formats (less reliable)
+            try {
+                console.log('📡 Method 4: Trying direct YouTube format extraction...');
+                // Attempt to get audio from public YouTube API
                 const apiUrl = `https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO90d0o_cVHv7dIVnTjsnmmUi8W-UqWYU`;
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -6503,22 +6561,22 @@ MIT License - See \`LICENSE.txt\` for details
                     })
                 });
                 
-                if (!response.ok) throw new Error('API request failed');
-                const data = await response.json();
-                
-                // Extract audio URL from formats
-                if (data.streamingData && data.streamingData.formats) {
-                    const audioFormat = data.streamingData.formats.find(f => f.mimeType.includes('audio'));
-                    if (audioFormat && audioFormat.url) {
-                        console.log('✅ YouTube audio URL extracted');
-                        return audioFormat.url;
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.streamingData && data.streamingData.formats) {
+                        const audioFormat = data.streamingData.formats.find(f => f.mimeType.includes('audio'));
+                        if (audioFormat && audioFormat.url) {
+                            console.log('✅ Audio extracted via direct YouTube API');
+                            return audioFormat.url;
+                        }
                     }
                 }
-                return null;
             } catch (e) {
-                console.warn('YouTube audio extraction failed:', e);
-                return null;
+                console.warn('❌ Direct YouTube API failed:', e.message);
             }
+            
+            console.error('❌ All YouTube audio extraction methods failed');
+            return null;
         }
 
         // STREAM HANDLERS - inserted here after all globals are defined
@@ -6537,7 +6595,25 @@ MIT License - See \`LICENSE.txt\` for details
             
             if ((url.includes('youtube') || url.includes('youtu.be')) && !preferEmbed) {
                 // User prefers audio-only mode: try to extract audio stream
-                alert('🎵 Extracting YouTube audio...\n\nNote: YouTube audio extraction works best on deployed domains with proper CORS setup.\n\nFor testing, enable "Prefer Embed" option.');
+                console.log('🎵 Attempting YouTube audio extraction...');
+                convertYouTubeToAudio(url).then(audioUrl => {
+                    if (audioUrl) {
+                        console.log('✅ YouTube audio extracted successfully! Playing as audio stream...');
+                        audioPlayer.src = audioUrl;
+                        audioPlayer.crossOrigin = 'anonymous';
+                        ensureAudioInitialized();
+                        audioPlayer.play().catch(err => console.error('Playback error:', err));
+                        // Update UI
+                        if (document.getElementById('nowPlayingTitle')) {
+                            document.getElementById('nowPlayingTitle').textContent = '🎵 YouTube Audio: ' + (extractYouTubeId(url) || 'Playing...');
+                        }
+                    } else {
+                        alert('❌ YouTube audio extraction failed.\n\nThis can happen if:\n- YouTube blocks the extraction service\n- The video has restricted audio\n- Network/CORS issues\n\nSolutions:\n1. Enable "Prefer Embed" to play video instead\n2. Use direct MP3/M3U8 streams\n3. Try a different YouTube URL');
+                    }
+                }).catch(err => {
+                    console.error('YouTube extraction error:', err);
+                    alert('❌ Error during YouTube audio extraction:\n' + err.message);
+                });
                 return;
             }
             
