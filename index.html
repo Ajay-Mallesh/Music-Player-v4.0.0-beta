@@ -6788,6 +6788,13 @@ MIT License - See \`LICENSE.txt\` for details
             if (!url) return alert('Enter a stream URL to open');
             window.open(url, '_blank');
         }
+
+        // Expose functions to global scope
+        window.playStreamUrlSimple = playStreamUrlSimple;
+        window.addStreamFromInput = addStreamFromInput;
+        window.playStreamFromInput = playStreamFromInput;
+        window.deleteStream = deleteStream;
+        window.convertYouTubeToAudio = convertYouTubeToAudio;
     })();
 
     // Fallback functions for global callback references
@@ -6816,6 +6823,14 @@ MIT License - See \`LICENSE.txt\` for details
             } catch (e) {
                 console.log('hidePreview error:', e);
             }
+        };
+    }
+
+    // Expose playStreamUrlSimple to global scope for onclick handlers
+    if (typeof window.playStreamUrlSimple !== 'function') {
+        window.playStreamUrlSimple = function(url) {
+            console.error('playStreamUrlSimple not yet initialized. Please wait for page to load fully.');
+            alert('Player is still loading. Please try again in a moment.');
         };
     }
     </script>
