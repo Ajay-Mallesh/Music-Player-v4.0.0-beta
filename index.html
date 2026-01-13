@@ -6495,62 +6495,109 @@ MIT License - See \`LICENSE.txt\` for details
             if (!videoId) return null;
             
             console.log('🔍 Attempting YouTube audio extraction for:', videoId);
+            console.log('📋 Trying multiple extraction methods...');
             
             // METHOD 1: Try Noxplayer API (most reliable free service)
             try {
-                console.log('📡 Method 1: Trying Noxplayer API...');
+                console.log('📡 Method 1/6: Trying Noxplayer API...');
                 const noxUrl = `https://noxplayer.com/api/convert?url=https://www.youtube.com/watch?v=${videoId}`;
-                const response = await fetch(noxUrl);
+                const response = await fetch(noxUrl, { mode: 'cors' });
                 
                 if (response.ok) {
                     const data = await response.json();
                     if (data.url) {
-                        console.log('✅ Audio extracted via Noxplayer');
+                        console.log('✅ SUCCESS: Audio extracted via Noxplayer');
                         return data.url;
                     }
                 }
+                console.log('⚠️ Noxplayer returned no audio URL');
             } catch (e) {
                 console.warn('❌ Noxplayer API failed:', e.message);
             }
             
             // METHOD 2: Try YouTube ScriptAPI (server-based)
             try {
-                console.log('📡 Method 2: Trying YouTube ScriptAPI...');
+                console.log('📡 Method 2/6: Trying YouTube ScriptAPI...');
                 const scriptApiUrl = `https://youtube-script-api.vercel.app/api/getAudio?id=${videoId}`;
-                const response = await fetch(scriptApiUrl);
+                const response = await fetch(scriptApiUrl, { mode: 'cors' });
                 
                 if (response.ok) {
                     const data = await response.json();
                     if (data.audioUrl) {
-                        console.log('✅ Audio extracted via ScriptAPI');
+                        console.log('✅ SUCCESS: Audio extracted via ScriptAPI');
                         return data.audioUrl;
                     }
                 }
+                console.log('⚠️ ScriptAPI returned no audio URL');
             } catch (e) {
                 console.warn('❌ ScriptAPI failed:', e.message);
             }
             
             // METHOD 3: Try infernoYT (alternative service)
             try {
-                console.log('📡 Method 3: Trying infernoYT...');
+                console.log('📡 Method 3/6: Trying infernoYT...');
                 const infernoUrl = `https://infernoyt.herokuapp.com/api/audioUrl?url=https://www.youtube.com/watch?v=${videoId}`;
-                const response = await fetch(infernoUrl);
+                const response = await fetch(infernoUrl, { mode: 'cors' });
                 
                 if (response.ok) {
                     const data = await response.json();
                     if (data.url) {
-                        console.log('✅ Audio extracted via infernoYT');
+                        console.log('✅ SUCCESS: Audio extracted via infernoYT');
                         return data.url;
                     }
                 }
+                console.log('⚠️ infernoYT returned no audio URL');
             } catch (e) {
                 console.warn('❌ infernoYT failed:', e.message);
             }
             
-            // METHOD 4: Fallback - Direct YouTube audio formats (less reliable)
+            // METHOD 4: Try yt-dlp API (if available)
             try {
-                console.log('📡 Method 4: Trying direct YouTube format extraction...');
-                // Attempt to get audio from public YouTube API
+                console.log('📡 Method 4/6: Trying yt-dlp API...');
+                const ytdlpUrl = `https://api.cobalt.tools/api/json`;
+                const response = await fetch(ytdlpUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: `https://www.youtube.com/watch?v=${videoId}`,
+                        vCodec: 'none',  // Audio only
+                        aCodec: 'aac'    // Audio codec
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.url) {
+                        console.log('✅ SUCCESS: Audio extracted via yt-dlp');
+                        return data.url;
+                    }
+                }
+                console.log('⚠️ yt-dlp API returned no audio URL');
+            } catch (e) {
+                console.warn('❌ yt-dlp API failed:', e.message);
+            }
+            
+            // METHOD 5: Try AllTube API
+            try {
+                console.log('📡 Method 5/6: Trying AllTube API...');
+                const alltube = `https://alltube.tv/api/json?url=https://www.youtube.com/watch?v=${videoId}&audioFormat=mp3`;
+                const response = await fetch(alltube, { mode: 'cors' });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.url) {
+                        console.log('✅ SUCCESS: Audio extracted via AllTube');
+                        return data.url;
+                    }
+                }
+                console.log('⚠️ AllTube returned no audio URL');
+            } catch (e) {
+                console.warn('❌ AllTube API failed:', e.message);
+            }
+            
+            // METHOD 6: Fallback - Direct YouTube audio formats (less reliable)
+            try {
+                console.log('📡 Method 6/6: Trying direct YouTube format extraction...');
                 const apiUrl = `https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO90d0o_cVHv7dIVnTjsnmmUi8W-UqWYU`;
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -6566,16 +6613,23 @@ MIT License - See \`LICENSE.txt\` for details
                     if (data.streamingData && data.streamingData.formats) {
                         const audioFormat = data.streamingData.formats.find(f => f.mimeType.includes('audio'));
                         if (audioFormat && audioFormat.url) {
-                            console.log('✅ Audio extracted via direct YouTube API');
+                            console.log('✅ SUCCESS: Audio extracted via direct YouTube API');
                             return audioFormat.url;
                         }
                     }
                 }
+                console.log('⚠️ Direct YouTube API returned no audio');
             } catch (e) {
                 console.warn('❌ Direct YouTube API failed:', e.message);
             }
             
-            console.error('❌ All YouTube audio extraction methods failed');
+            console.error('❌ All 6 YouTube audio extraction methods failed');
+            console.error('Possible reasons:');
+            console.error('  - YouTube updated their security/blocking');
+            console.error('  - All extraction APIs are currently blocked by YouTube');
+            console.error('  - Video has restricted audio or DRM protection');
+            console.error('  - Network/CORS issues');
+            console.error('\n💡 Workaround: Use "Prefer Embed" to play video, or try a different YouTube URL');
             return null;
         }
 
@@ -6598,7 +6652,7 @@ MIT License - See \`LICENSE.txt\` for details
                 console.log('🎵 Attempting YouTube audio extraction...');
                 convertYouTubeToAudio(url).then(audioUrl => {
                     if (audioUrl) {
-                        console.log('✅ YouTube audio extracted successfully! Playing as audio stream...');
+                        console.log('✅ YouTube audio extracted successfully! Playing as audio stream with EQ support...');
                         audioPlayer.src = audioUrl;
                         audioPlayer.crossOrigin = 'anonymous';
                         ensureAudioInitialized();
@@ -6607,12 +6661,13 @@ MIT License - See \`LICENSE.txt\` for details
                         if (document.getElementById('nowPlayingTitle')) {
                             document.getElementById('nowPlayingTitle').textContent = '🎵 YouTube Audio: ' + (extractYouTubeId(url) || 'Playing...');
                         }
+                        alert('✅ SUCCESS!\n\nYouTube audio extracted and playing.\n\n🎛️ Your EQ controls now work!\n\nTry adjusting Bass, Treble, or the Equalizer sliders.');
                     } else {
-                        alert('❌ YouTube audio extraction failed.\n\nThis can happen if:\n- YouTube blocks the extraction service\n- The video has restricted audio\n- Network/CORS issues\n\nSolutions:\n1. Enable "Prefer Embed" to play video instead\n2. Use direct MP3/M3U8 streams\n3. Try a different YouTube URL');
+                        alert('❌ YouTube Audio Extraction Failed\n\nTried 6 different extraction methods:\n1. Noxplayer API\n2. YouTube ScriptAPI\n3. infernoYT\n4. yt-dlp API\n5. AllTube API\n6. Direct YouTube API\n\nAll failed. Possible reasons:\n- YouTube has blocked all extraction services\n- Video has DRM protection\n- Network/CORS issues\n- Check browser console (F12) for details\n\n💡 Solutions:\n• Enable "Prefer Embed" to play video instead\n• Try a different YouTube URL\n• Use direct MP3/M3U8 streams for guaranteed EQ support');
                     }
                 }).catch(err => {
                     console.error('YouTube extraction error:', err);
-                    alert('❌ Error during YouTube audio extraction:\n' + err.message);
+                    alert('❌ Error during YouTube audio extraction:\n' + err.message + '\n\nCheck browser console (F12) for details');
                 });
                 return;
             }
